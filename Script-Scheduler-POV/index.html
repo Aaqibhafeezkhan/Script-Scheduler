@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Scheduler</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">📋 Script Scheduler</h1>
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="upload">Upload Script</button>
+                <button class="nav-tab" data-tab="jobs">My Jobs <span id="jobs-count" class="jobs-count">0</span></button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <!-- Upload Tab -->
+            <section id="upload-tab" class="tab-content active">
+                <div class="card">
+                    <h2>Upload & Schedule Script</h2>
+                    
+                    <!-- Upload Form -->
+                    <form id="upload-form" class="upload-form">
+                        <div class="form-group">
+                            <label for="script-file" class="form-label">Script File</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="script-file" accept=".sh,.bat" class="file-input">
+                                <div class="file-input-display">
+                                    <span class="file-icon">📄</span>
+                                    <span class="file-text">Choose .sh or .bat file (max 1MB)</span>
+                                </div>
+                            </div>
+                            <div id="file-error" class="error-message hidden"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="script-name" class="form-label">Script Name</label>
+                            <input type="text" id="script-name" class="form-input" placeholder="Enter script name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="platform" class="form-label">Platform</label>
+                            <select id="platform" class="form-select">
+                                <option value="linux">🐧 Linux/macOS</option>
+                                <option value="windows">🪟 Windows</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" id="upload-btn" class="btn btn-primary" disabled>
+                            Upload Script
+                        </button>
+                    </form>
+
+                    <!-- Scheduling Form (Initially Hidden) -->
+                    <div id="scheduling-section" class="scheduling-section hidden">
+                        <h3>Schedule Execution</h3>
+                        <form id="scheduling-form" class="scheduling-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Run Frequency</label>
+                                    <div class="frequency-input">
+                                        <input type="number" id="frequency-value" class="form-input" min="1" value="1">
+                                        <select id="frequency-unit" class="form-select">
+                                            <option value="minutes">Minutes</option>
+                                            <option value="hours">Hours</option>
+                                            <option value="days">Days</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="start-time" class="form-label">Start At</label>
+                                    <input type="datetime-local" id="start-time" class="form-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="end-time" class="form-label">End At (Optional)</label>
+                                    <input type="datetime-local" id="end-time" class="form-input">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="run-immediately" class="checkbox">
+                                    <span class="checkmark"></span>
+                                    Run immediately
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-success">
+                                Schedule Job
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Jobs Tab -->
+            <section id="jobs-tab" class="tab-content">
+                <div class="jobs-header">
+                    <h2>My Jobs</h2>
+                    <div class="jobs-controls">
+                        <input type="text" id="search-jobs" class="search-input" placeholder="Search jobs...">
+                        <select id="filter-status" class="form-select">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="running">Running</option>
+                            <option value="success">Success</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="jobs-list" class="jobs-list">
+                    <div class="no-jobs">
+                        <span class="no-jobs-icon">📝</span>
+                        <p>No jobs scheduled yet</p>
+                        <p class="no-jobs-subtitle">Upload and schedule your first script to get started</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Log Modal -->
+    <div id="log-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Job Logs</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="log-content" class="log-content"></pre>
+            </div>
+        </div>
+    </div>
+
+    <style>
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+.header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+}
+
+.header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 20px;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-tab {
+    background: none;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-tab:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.nav-tab.active {
+    background: #667eea;
+    color: white;
+}
+
+.jobs-count {
+    background: #ff6b6b;
+    color: white;
+    border-radius: 12px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+/* Main Content */
+.main {
+    padding: 2rem 0;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Cards */
+.card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.card h2 {
+    margin-bottom: 1.5rem;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.card h3 {
+    margin-bottom: 1rem;
+    color: #667eea;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* File Input */
+.file-input-wrapper {
+    position: relative;
+    cursor: pointer;
+}
+
+.file-input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.file-input-display {
+    border: 2px dashed #e1e5e9;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: #fafbfc;
+}
+
+.file-input-display:hover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.file-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.file-text {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.file-input-display.has-file {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.file-input-display.has-file .file-text {
+    color: #4caf50;
+    font-weight: 600;
+}
+
+/* Frequency Input */
+.frequency-input {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.frequency-input .form-input {
+    flex: 1;
+    max-width: 100px;
+}
+
+.frequency-input .form-select {
+    flex: 2;
+}
+
+/* Checkbox */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.checkbox {
+    margin-right: 0.75rem;
+    transform: scale(1.2);
+}
+
+/* Buttons */
+.btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn:hover {
+    background: #5a67d8;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-success {
+    background: #4caf50;
+}
+
+.btn-success:hover {
+    background: #45a049;
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+}
+
+.btn-danger {
+    background: #ff6b6b;
+}
+
+.btn-danger:hover {
+    background: #ff5252;
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Jobs Section */
+.jobs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.jobs-header h2 {
+    color: white;
+    font-size: 2rem;
+}
+
+.jobs-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.search-input {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 25px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    width: 250px;
+}
+
+.search-input:focus {
+    outline: none;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+/* Job Cards */
+.jobs-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.job-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.job-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.job-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.job-title h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.1rem;
+}
+
+.platform-icon {
+    font-size: 1.2rem;
+}
+
+.job-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-pending {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ff8f00;
+}
+
+.status-running {
+    background: rgba(33, 150, 243, 0.2);
+    color: #1976d2;
+}
+
+.status-success {
+    background: rgba(76, 175, 80, 0.2);
+    color: #388e3c;
+}
+
+.status-error {
+    background: rgba(244, 67, 54, 0.2);
+    color: #d32f2f;
+}
+
+.job-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.job-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* No Jobs State */
+.no-jobs {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.no-jobs-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.no-jobs p {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.no-jobs-subtitle {
+    font-size: 1rem;
+    opacity: 0.7;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+.modal-close:hover {
+    background: #f5f5f5;
+}
+
+.modal-body {
+    padding: 2rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.log-content {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: 8px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+
+/* Loading */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toast Notifications */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 3000;
+}
+
+.toast {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 300px;
+    transform: translateX(400px);
+    animation: slideIn 0.3s ease forwards;
+    border-left: 4px solid #667eea;
+}
+
+.toast.success {
+    border-left-color: #4caf50;
+}
+
+.toast.error {
+    border-left-color: #ff6b6b;
+}
+
+.toast-icon {
+    font-size: 1.2rem;
+}
+
+.toast-message {
+    flex: 1;
+}
+
+@keyframes slideIn {
+    to { transform: translateX(0); }
+}
+
+/* Error Messages */
+.error-message {
+    color: #d32f2f;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.error-message::before {
+    content: '⚠️';
+}
+
+/* Hidden Class */
+.hidden {
+    display: none !important;
+}
+
+.scheduling-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #eee;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header .container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .nav-tabs {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .jobs-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .jobs-controls {
+        flex-direction: column;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    .job-info {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .job-actions {
+        justify-content: center;
+    }
+
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 0 15px;
+    }
+
+    .card {
+        padding: 1.5rem;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .job-actions .btn {
+        width: auto;
+        flex: 1;
+    }
+}
+    </style>
+
+    <script>
+// Global state management
+class JobScheduler {
+    constructor() {
+        this.jobs = new Map();
+        this.timers = new Map();
+        this.currentScript = null;
+        this.init();
+    }
+
+    init() {
+        this.loadJobs();
+        this.bindEvents();
+        this.setDefaultDateTime();
+        this.updateJobsCount();
+        this.scheduleExistingJobs();
+    }
+
+    // In-memory storage methods (simulating localStorage)
+    loadJobs() {
+        // In a real app, this would be: JSON.parse(localStorage.getItem('scheduledJobs') || '[]')
+        // For demo purposes, we'll start with empty jobs
+        this.jobs = new Map();
+    }
+
+    saveJobs() {
+        // In a real app, this would be: localStorage.setItem('scheduledJobs', JSON.stringify(Array.from(this.jobs.values())))
+        // For demo, we just keep jobs in memory
+        console.log('Jobs saved to memory:', Array.from(this.jobs.values()));
+    }
+
+    // Event binding
+    bindEvents() {
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+        });
+
+        // File upload
+        const fileInput = document.getElementById('script-file');
+        const uploadForm = document.getElementById('upload-form');
+        const schedulingForm = document.getElementById('scheduling-form');
+
+        fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        uploadForm.addEventListener('submit', (e) => this.handleUpload(e));
+        schedulingForm.addEventListener('submit', (e) => this.handleScheduling(e));
+
+        // Modal close
+        document.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
+        document.getElementById('log-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'log-modal') this.closeModal();
+        });
+
+        // Search and filter
+        document.getElementById('search-jobs').addEventListener('input', (e) => this.filterJobs());
+        document.getElementById('filter-status').addEventListener('change', (e) => this.filterJobs());
+
+        // Run immediately checkbox
+        document.getElementById('run-immediately').addEventListener('change', (e) => {
+            const startTime = document.getElementById('start-time');
+            if (e.target.checked) {
+                startTime.value = new Date().toISOString().slice(0, 16);
+            }
+        });
+    }
+
+    // Tab switching
+    switchTab(tabName) {
+        document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+
+        if (tabName === 'jobs') {
+            this.renderJobs();
+        }
+    }
+
+    // File handling
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        const fileError = document.getElementById('file-error');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileDisplay = document.querySelector('.file-input-display');
+        const scriptName = document.getElementById('script-name');
+        const platform = document.getElementById('platform');
+
+        fileError.classList.add('hidden');
+
+        if (!file) {
+            uploadBtn.disabled = true;
+            fileDisplay.classList.remove('has-file');
+            return;
+        }
+
+        // Validate file
+        const validExtensions = ['.sh', '.bat'];
+        const fileName = file.name.toLowerCase();
+        const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+        const maxSize = 1024 * 1024; // 1MB
+
+        if (!isValidExtension) {
+            this.showError(fileError, 'Please select a .sh or .bat file');
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        if (file.size > maxSize) {
+            this.showError(fileError, 'File size must be less than 1MB');
+            uploadBtn.disabled = true;
+            return;
+        }
+
+        // Auto-fill script name and platform
+        const baseName = file.name.replace(/\.[^/.]+$/, '');
+        scriptName.value = baseName;
+        platform.value = fileName.endsWith('.bat') ? 'windows' : 'linux';
+
+        // Update UI
+        fileDisplay.classList.add('has-file');
+        fileDisplay.querySelector('.file-text').textContent = file.name;
+        uploadBtn.disabled = false;
+    }
+
+    // Upload handling
+    async handleUpload(event) {
+        event.preventDefault();
+        
+        const fileInput = document.getElementById('script-file');
+        const scriptName = document.getElementById('script-name').value.trim();
+        const platform = document.getElementById('platform').value;
+
+        if (!fileInput.files[0] || !scriptName) {
+            this.showToast('Please fill in all required fields', 'error');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const fileContent = await this.readFile(fileInput.files[0]);
+            
+            this.currentScript = {
+                name: scriptName,
+                platform: platform,
+                content: fileContent,
+                filename: fileInput.files[0].name
+            };
+
+            // Show scheduling section
+            document.getElementById('scheduling-section').classList.remove('hidden');
+            this.showToast('Script uploaded successfully!', 'success');
+            
+        } catch (error) {
+            this.showToast('Error reading file: ' + error.message, 'error');
+        }
+
+        this.showLoading(false);
+    }
+
+    // File reading utility
+    readFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = e => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+        });
+    }
+
+    // Scheduling handling
+    handleScheduling(event) {
+        event.preventDefault();
+
+        if (!this.currentScript) {
+            this.showToast('No script uploaded', 'error');
+            return;
+        }
+
+        const frequencyValue = parseInt(document.getElementById('frequency-value').value);
+        const frequencyUnit = document.getElementById('frequency-unit').value;
+        const startTime = document.getElementById('start-time').value;
+        const endTime = document.getElementById('end-time').value;
+        const runImmediately = document.getElementById('run-immediately').checked;
+
+        if (!startTime) {
+            this.showToast('Please set a start time', 'error');
+            return;
+        }
+
+        const startDate = new Date(startTime);
+        const endDate = endTime ? new Date(endTime) : null;
+
+        if (startDate <= new Date() && !runImmediately) {
+            this.showToast('Start time must be in the future', 'error');
+            return;
+        }
+
+        if (endDate && endDate <= startDate) {
+            this.showToast('End time must be after start time', 'error');
+            return;
+        }
+
+        // Create job
+        const job = {
+            id: this.generateId(),
+            name: this.currentScript.name,
+            platform: this.currentScript.platform,
+            content: this.currentScript.content,
+            filename: this.currentScript.filename,
+            frequency: {
+                value: frequencyValue,
+                unit: frequencyUnit
+            },
+            startTime: startDate.toISOString(),
+            endTime: endDate ? endDate.toISOString() : null,
+            status: 'pending',
+            lastRun: null,
+            nextRun: runImmediately ? new Date().toISOString() : startDate.toISOString(),
+            logs: [],
+            createdAt: new Date().toISOString()
+        };
+
+        this.jobs.set(job.id, job);
+        this.saveJobs();
+        this.scheduleJob(job);
+        this.updateJobsCount();
+
+        this.showToast(`Job "${job.name}" scheduled successfully!`, 'success');
+        this.resetForms();
+    }
+
+    // Job scheduling engine
+    scheduleJob(job) {
+        if (this.timers.has(job.id)) {
+            clearTimeout(this.timers.get(job.id));
+        }
+
+        const nextRun = new Date(job.nextRun);
+        const now = new Date();
+        const delay = Math.max(0, nextRun.getTime() - now.getTime());
+
+        const timer = setTimeout(() => {
+            this.executeJob(job.id);
+        }, delay);
+
+        this.timers.set(job.id, timer);
+    }
+
+    // Job execution simulation
+    async executeJob(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job) return;
+
+        // Check if job should still run
+        if (job.endTime && new Date() > new Date(job.endTime)) {
+            job.status = 'completed';
+            this.jobs.set(jobId, job);
+            this.saveJobs();
+            return;
+        }
+
+        job.status = 'running';
+        job.lastRun = new Date().toISOString();
+        this.jobs.set(jobId, job);
+        this.saveJobs();
+
+        // Simulate script execution
+        const executionLog = await this.simulateScriptExecution(job);
+        
+        // Update job with results
+        job.status = executionLog.success ? 'success' : 'error';
+        job.logs.push(executionLog);
+        
+        // Calculate next run
+        const nextRun = this.calculateNextRun(job);
+        if (nextRun && (!job.endTime || nextRun < new Date(job.endTime))) {
+            job.nextRun = nextRun.toISOString();
+            job.status = 'pending';
+            this.scheduleJob(job);
+        } else {
+            job.nextRun = null;
+            job.status = 'completed';
+        }
+
+        this.jobs.set(jobId, job);
+        this.saveJobs();
+
+        // Show notification
+        const message = executionLog.success ? 
+            `Job "${job.name}" executed successfully` : 
+            `Job "${job.name}" failed with errors`;
+        this.showToast(message, executionLog.success ? 'success' : 'error');
+    }
+
+    // Script execution simulation
+    async simulateScriptExecution(job) {
+        const timestamp = new Date().toISOString();
+        const lines = job.content.split('\n').filter(line => line.trim());
+        let output = `[${timestamp}] Starting execution of ${job.filename}\n`;
+        let success = true;
+
+        // Simulate execution delay
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+
+        for (const line of lines) {
+            if (line.trim().startsWith('#') || line.trim().startsWith('REM')) {
+                // Skip comments
+                continue;
+            }
+            
+            // Simulate command execution
+            output += `> ${line}\n`;
+            
+            // Randomly simulate some failures for demo
+            if (Math.random() < 0.1 && line.trim() !== '') {
+                output += `Error: Command failed with exit code 1\n`;
+                success = false;
+                break;
+            } else {
+                // Simulate successful output
+                output += `Command executed successfully\n`;
+            }
+        }
+
+        output += `[${new Date().toISOString()}] Execution ${success ? 'completed' : 'failed'}\n`;
+
+        return {
+            timestamp,
+            output,
+            success,
+            duration: Math.floor(1000 + Math.random() * 2000)
+        };
+    }
+
+    // Calculate next run time
+    calculateNextRun(job) {
+        const lastRun = new Date(job.lastRun);
+        const { value, unit } = job.frequency;
+        
+        let nextRun = new Date(lastRun);
+        
+        switch (unit) {
+            case 'minutes':
+                nextRun.setMinutes(nextRun.getMinutes() + value);
+                break;
+            case 'hours':
+                nextRun.setHours(nextRun.getHours() + value);
+                break;
+            case 'days':
+                nextRun.setDate(nextRun.getDate() + value);
+                break;
+        }
+
+        return nextRun;
+    }
+
+    // Schedule existing jobs on page load
+    scheduleExistingJobs() {
+        this.jobs.forEach(job => {
+            if (job.status === 'pending' && job.nextRun) {
+                const nextRun = new Date(job.nextRun);
+                if (nextRun > new Date()) {
+                    this.scheduleJob(job);
+                } else {
+                    // Missed execution, schedule immediately
+                    job.nextRun = new Date().toISOString();
+                    this.scheduleJob(job);
+                }
+            }
+        });
+    }
+
+    // Job management
+    cancelJob(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job) return;
+
+        if (this.timers.has(jobId)) {
+            clearTimeout(this.timers.get(jobId));
+            this.timers.delete(jobId);
+        }
+
+        job.status = 'cancelled';
+        job.endTime = new Date().toISOString();
+        job.nextRun = null;
+        
+        this.jobs.set(jobId, job);
+        this.saveJobs();
+        this.renderJobs();
+        this.showToast(`Job "${job.name}" cancelled`, 'success');
+    }
+
+    deleteJob(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job) return;
+
+        if (this.timers.has(jobId)) {
+            clearTimeout(this.timers.get(jobId));
+            this.timers.delete(jobId);
+        }
+
+        this.jobs.delete(jobId);
+        this.saveJobs();
+        this.updateJobsCount();
+        this.renderJobs();
+        this.showToast(`Job "${job.name}" deleted`, 'success');
+    }
+
+    viewLogs(jobId) {
+        const job = this.jobs.get(jobId);
+        if (!job) return;
+
+        const modal = document.getElementById('log-modal');
+        const title = document.getElementById('modal-title');
+        const content = document.getElementById('log-content');
+
+        title.textContent = `Logs for ${job.name}`;
+        
+        if (job.logs.length === 0) {
+            content.textContent = 'No execution logs available yet.';
+        } else {
+            content.textContent = job.logs.map(log => log.output).join('\n---\n\n');
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    closeModal() {
+        document.getElementById('log-modal').classList.add('hidden');
+    }
+
+    // Job rendering
+    renderJobs() {
+        const jobsList = document.getElementById('jobs-list');
+        const jobs = Array.from(this.jobs.values());
+
+        if (jobs.length === 0) {
+            jobsList.innerHTML = `
+                <div class="no-jobs">
+                    <span class="no-jobs-icon">📝</span>
+                    <p>No jobs scheduled yet</p>
+                    <p class="no-jobs-subtitle">Upload and schedule your first script to get started</p>
+                </div>
+            `;
+            return;
+        }
+
+        const filteredJobs = this.getFilteredJobs(jobs);
+
+        if (filteredJobs.length === 0) {
+            jobsList.innerHTML = `
+                <div class="no-jobs">
+                    <span class="no-jobs-icon">🔍</span>
+                    <p>No jobs match your filters</p>
+                </div>
+            `;
+            return;
+        }
+
+        jobsList.innerHTML = filteredJobs.map(job => this.renderJobCard(job)).join('');
+    }
+
+    renderJobCard(job) {
+        const platformIcon = job.platform === 'windows' ? '🪟' : '🐧';
+        const statusClass = `status-${job.status}`;
+        const nextRunText = job.nextRun ? 
+            this.formatDateTime(job.nextRun) : 
+            'Not scheduled';
+        const lastRunText = job.lastRun ? 
+            this.formatDateTime(job.lastRun) : 
+            'Never';
+
+        return `
+            <div class="job-card">
+                <div class="job-header">
+                    <div class="job-title">
+                        <span class="platform-icon">${platformIcon}</span>
+                        <h3>${job.name}</h3>
+                    </div>
+                    <div class="job-status">
+                        <span class="status-badge ${statusClass}">${job.status}</span>
+                    </div>
+                </div>
+                
+                <div class="job-info">
+                    <div><strong>Frequency:</strong> Every ${job.frequency.value} ${job.frequency.unit}</div>
+                    <div><strong>Last Run:</strong> ${lastRunText}</div>
+                    <div><strong>Next Run:</strong> ${nextRunText}</div>
+                    <div><strong>Logs:</strong> ${job.logs.length} executions</div>
+                </div>
+                
+                <div class="job-actions">
+                    <button class="btn btn-secondary btn-small" onclick="scheduler.viewLogs('${job.id}')">
+                        📋 View Logs
+                    </button>
+                    ${job.status === 'pending' || job.status === 'running' ? 
+                        `<button class="btn btn-danger btn-small" onclick="scheduler.cancelJob('${job.id}')">
+                            ⏹️ Cancel
+                        </button>` : ''
+                    }
+                    <button class="btn btn-danger btn-small" onclick="scheduler.deleteJob('${job.id}')">
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Filtering and searching
+    getFilteredJobs(jobs) {
+        const searchTerm = document.getElementById('search-jobs').value.toLowerCase();
+        const statusFilter = document.getElementById('filter-status').value;
+
+        return jobs.filter(job => {
+            const matchesSearch = job.name.toLowerCase().includes(searchTerm) ||
+                                job.filename.toLowerCase().includes(searchTerm);
+            const matchesStatus = !statusFilter || job.status === statusFilter;
+            
+            return matchesSearch && matchesStatus;
+        }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    filterJobs() {
+        this.renderJobs();
+    }
+
+    // Utility methods
+    generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    formatDateTime(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+
+    setDefaultDateTime() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 5); // Default to 5 minutes from now
+        document.getElementById('start-time').value = now.toISOString().slice(0, 16);
+    }
+
+    updateJobsCount() {
+        const count = this.jobs.size;
+        document.getElementById('jobs-count').textContent = count;
+    }
+
+    resetForms() {
+        document.getElementById('upload-form').reset();
+        document.getElementById('scheduling-form').reset();
+        document.getElementById('scheduling-section').classList.add('hidden');
+        document.querySelector('.file-input-display').classList.remove('has-file');
+        document.querySelector('.file-text').textContent = 'Choose .sh or .bat file (max 1MB)';
+        document.getElementById('upload-btn').disabled = true;
+        this.currentScript = null;
+        this.setDefaultDateTime();
+    }
+
+    // UI helpers
+    showError(element, message) {
+        element.textContent = message;
+        element.classList.remove('hidden');
+    }
+
+    showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        if (show) {
+            overlay.classList.remove('hidden');
+        } else {
+            overlay.classList.add('hidden');
+        }
+    }
+
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        
+        const icons = {
+            success: '✅',
+            error: '❌',
+            info: 'ℹ️'
+        };
+
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type] || icons.info}</span>
+            <span class="toast-message">${message}</span>
+        `;
+
+        container.appendChild(toast);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 5000);
+    }
+}
+
+// Initialize the application
+const scheduler = new JobScheduler();
+
+// Auto-refresh jobs view every 30 seconds
+setInterval(() => {
+    if (document.getElementById('jobs-tab').classList.contains('active')) {
+        scheduler.renderJobs();
+    }
+}, 30000);
+    </script>
+</body>
+</html>

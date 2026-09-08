@@ -1,0 +1,38 @@
+/* reset & base */
+* { box-sizing: border-box; margin:0; padding:0; }
+body { font-family: sans-serif; line-height:1.5; background:#f4f4f9; color:#333; }
+header { background:#fff; padding:1rem; box-shadow:0 1px 4px rgba(0,0,0,.1); display:flex; align-items:center; justify-content:space-between; }
+h1 { font-size:1.5rem; }
+nav button { background:none; border:none; padding:.5rem 1rem; cursor:pointer; font-size:1rem; }
+nav button.active { border-bottom:2px solid #007BFF; color:#007BFF; }
+
+main { padding:1rem; max-width:800px; margin:0 auto; }
+form { background:#fff; padding:1rem; margin-bottom:1rem; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+form.hidden { display:none; }
+form h2 { margin-bottom:.5rem; }
+
+label { display:block; margin-bottom:.75rem; }
+input[type="text"], input[type="number"], input[type="datetime-local"], select, input[type="file"] {
+  width:100%; padding:.5rem; border:1px solid #ccc; border-radius:4px;
+}
+.checkbox { display:flex; align-items:center; }
+.checkbox input { width:auto; margin-right:.5rem; }
+button { background:#007BFF; color:#fff; border:none; padding:.6rem 1.2rem; border-radius:4px; cursor:pointer; }
+button:disabled { background:#aaa; }
+.error { color:red; font-size:.9rem; min-height:1.2em; }
+
+#jobs-container { display:grid; grid-template-columns:1fr; gap:1rem; }
+.job-card { background:#fff; padding:1rem; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.1); position:relative; }
+.job-card .status { position:absolute; top:1rem; right:1rem; padding:.2rem .6rem; border-radius:4px; color:#fff; }
+.status.success { background:green; }
+.status.error { background:red; }
+
+.job-card button { margin-right:.5rem; margin-top:.5rem; }
+
+#modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; }
+#modal.hidden { display:none; }
+.modal-content { background:#fff; padding:1rem; border-radius:8px; width:90%; max-width:600px; max-height:80%; overflow:auto; }
+#log-output { background:#111; color:#0f0; padding:.5rem; border-radius:4px; height:300px; overflow:auto; }
+
+#toast { position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:.5rem 1rem; border-radius:4px; opacity:0; transition:opacity .3s; }
+#toast.show { opacity:1; }
