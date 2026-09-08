@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+coverage/
+dist/
+backend/data/
+backend/scheduler.db
+frontend/dist/

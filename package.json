@@ -1,0 +1,15 @@
+{
+  "name": "script-scheduler",
+  "version": "2.0.0",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "npm --workspace backend start",
+    "start:frontend": "npm --workspace frontend start",
+    "build": "npm --workspace frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
